@@ -75,8 +75,13 @@ impl WebViewDelegate for Delegate {
 
 impl Engine {
     /// Create a software-rendering engine for a viewport of `width` x `height`
-    /// CSS pixels.
-    pub fn new(width: u32, height: u32) -> Result<Self, Box<dyn std::error::Error>> {
+    /// CSS pixels, loaded with `initial_url` (matching Servo's test pattern of
+    /// building the WebView directly with its target URL).
+    pub fn new(
+        width: u32,
+        height: u32,
+        initial_url: &str,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         // The crypto provider only needs to be installed once; an error here
         // (e.g. already installed) is harmless.
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -110,7 +115,7 @@ impl Engine {
         });
 
         let webview = WebViewBuilder::new(&servo, ctx)
-            .url(url::Url::parse("about:blank")?)
+            .url(url::Url::parse(initial_url)?)
             .delegate(delegate)
             .build();
         webview.show();
@@ -241,9 +246,14 @@ impl Engine {
     /// functional fallback that needs no pixel readback.
     pub fn text(&self, timeout: Duration) -> Option<String> {
         let (tx, rx) = mpsc::channel::<Option<String>>();
-        // Prefer the page title, then body text, then whole-document text.
+        // Prefer body text; fall back to title; include title as a heading when
+        // both are present.
         self.webview.evaluate_javascript(
-            "document.title || document.body?.innerText || document.body?.textContent || document.documentElement.textContent",
+            "(function(){ \
+               const body = (document.body && (document.body.innerText || document.body.textContent)) || ''; \
+               const title = document.title ? document.title + '\\n' : ''; \
+               return title + body; \
+             })()",
             move |result| {
                 let s = match result {
                     Ok(servo::JSValue::String(s)) => Some(s),

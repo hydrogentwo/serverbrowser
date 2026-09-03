@@ -21,29 +21,24 @@ manager backed by an Obsidian-like node mindmap.
 ## Status
 
 Fully buildable and running on Termux/Android (`aarch64-linux-android`). All unit
-tests (config, mindmap, nav, output) pass.
+tests (config, mindmap, nav, output) pass, and both text-mode and image-mode
+rendering work end-to-end.
 
-The Servo engine initializes, loads pages (network + JS), the QuteBrowser-style
-navigation and the bookmark/mindmap manager all work end-to-end.
+The Servo engine loads pages (network, `file://`, `data:`, JS), renders them
+through WebRender on Mesa's software driver, and captures pixels back. Navigation,
+bookmarks, and the mindmap all work.
 
-Known issue: pixel readback of the software renderer returns a blank (white)
-frame on Termux + Mesa. Servo renders through WebRender on Mesa's software
-driver, and `SoftwareRenderingContext`'s framebuffer readback does not capture
-the composited output on this setup. The whole pipeline (WebRender "generated
-frame with N passes", `notify_new_frame_ready` → `paint()`) runs; only the
-final `read_to_image` returns a cleared buffer.
-
-On Termux, Mesa defaults the surfaceless GL context to `zink` (Vulkan lavapipe).
-You can force the classic Gallium `llvmpipe` GL driver with:
+To run on Termux you must point Mesa at its classic Gallium `llvmpipe` GL driver
+(Termux otherwise defaults the surfaceless context to `zink`, which also works
+for rendering but is slower):
 
     MESA_LOADER_DRIVER_OVERRIDE=swrast GALLIUM_DRIVER=llvmpipe
 
-This changes the renderer from `zink` to `llvmpipe (LLVM …)` (verified), but the
-readback still returns a blank buffer — the remaining gap is in surfman's
-`mesa_surfaceless` texture-image framebuffer path (the `EGL_KHR_gl_texture_2D_image`
-extension), not the WebRender/GL rendering itself. The `text` output mode is a
-fallback that needs no pixel readback, but Servo's `innerText`/`textContent`
-evaluation currently returns empty on this build.
+or via `export`, plus `EGL_PLATFORM=surfaceless` for headless rendering:
+
+    EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 \
+      MESA_LOADER_DRIVER_OVERRIDE=swrast GALLIUM_DRIVER=llvmpipe \
+      serverbrowser render https://example.com
 
 ## Terminal output modes
 

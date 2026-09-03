@@ -75,12 +75,8 @@ fn cmd_render(cfg: &Config, args: &[String]) {
 }
 
 fn render_once(cfg: &Config, url: &str) {
-    match Engine::new(cfg.viewport_width, cfg.viewport_height) {
+    match Engine::new(cfg.viewport_width, cfg.viewport_height, url) {
         Ok(engine) => {
-            if let Err(e) = engine.load(url) {
-                eprintln!("load error: {e}");
-                return;
-            }
             let _ = engine.wait_for_load(Duration::from_secs(5));
             display_frame(cfg, &engine);
         }
@@ -118,12 +114,10 @@ fn interactive(cfg: &Config, url: &str) {
     let mut command = String::new();
     // Show a status line and prompt, then read a command.
     println!("serverbrowser — loading {url}");
-    match Engine::new(cfg.viewport_width, cfg.viewport_height) {
+    match Engine::new(cfg.viewport_width, cfg.viewport_height, url) {
         Ok(engine) => {
-            if engine.load(url).is_ok() {
-                let _ = engine.wait_for_load(Duration::from_secs(5));
-                display_frame(cfg, &engine);
-            }
+            let _ = engine.wait_for_load(Duration::from_secs(5));
+            display_frame(cfg, &engine);
             println!();
             println!("Press :, then a command (:open URL, :back, :reload, :quit).");
             loop {
