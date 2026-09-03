@@ -18,6 +18,25 @@ manager backed by an Obsidian-like node mindmap.
   stored on disk as plain `.md` files, so it is inspectable and editable
   elsewhere, and a future minimap can just read node/edge data.
 
+## Status
+
+Fully buildable and running on Termux/Android (`aarch64-linux-android`). All unit
+tests (config, mindmap, nav, output) pass.
+
+The Servo engine initializes, loads pages (network + JS), the QuteBrowser-style
+navigation and the bookmark/mindmap manager all work end-to-end.
+
+Known issue: pixel readback of the software renderer returns a blank (white)
+frame on Termux + Mesa. Servo renders through WebRender on Mesa's `zink`
+(Gallium-llvmpipe-over-Vulkan) software driver, and `SoftwareRenderingContext`'s
+framebuffer readback does not capture the composited output on this specific
+driver combination. The whole pipeline (WebRender "generated frame with N
+passes", `notify_new_frame_ready` → `paint()`) runs; only the final
+`read_to_image` returns a cleared buffer. The `text` output mode is a fallback
+that needs no pixel readback, but Servo's `innerText`/`textContent` evaluation
+currently returns empty on this build. Resolving the readback (e.g. forcing Mesa
+to the pure-Gallium `swrast` instead of `zink`) is the main remaining task.
+
 ## Terminal output modes
 
 | Mode | Protocol | Requirements |

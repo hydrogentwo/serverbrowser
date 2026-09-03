@@ -34,3 +34,10 @@ url = "2"
 [[bin]]
 name = "serverbrowser"
 path = "src/main.rs"
+
+# Termux patch: on Android, surfman selects the `hardware_buffer` backend
+# (AHardwareBuffer + EGL_ANDROID_get_native_client_buffer), which Mesa on
+# Termux does not provide. We vendor surfman and route it to the software
+# `mesa_surfaceless` backend instead (see vendor/surfman/build.rs).
+[patch.crates-io]
+surfman = { path = "vendor/surfman" }

@@ -81,24 +81,36 @@ fn render_once(cfg: &Config, url: &str) {
                 eprintln!("load error: {e}");
                 return;
             }
-            if engine.wait_for_frame(Duration::from_secs(20)) {
-                if let Some(pixels) = engine.snapshot() {
-                    let frame = Frame::from_rgba(
-                        cfg.viewport_width,
-                        cfg.viewport_height,
-                        pixels,
-                    );
-                    let mut stdout = std::io::stdout();
-                    let _ = emit(&mut stdout, &frame, resolve_output(cfg));
-                    let _ = stdout.flush();
-                } else {
-                    eprintln!("no frame captured");
-                }
-            } else {
-                eprintln!("timed out waiting for render");
-            }
+            let _ = engine.wait_for_load(Duration::from_secs(5));
+            display_frame(cfg, &engine);
         }
         Err(e) => eprintln!("failed to init engine: {e}"),
+    }
+}
+
+/// Render the engine's current frame to stdout using the configured output mode.
+fn display_frame(cfg: &Config, engine: &Engine) {
+    // Text mode: extract DOM text instead of rendering pixels.
+    if resolve_output(cfg) == OutputMode::Text {
+        match engine.text(Duration::from_secs(15)) {
+            Some(text) => println!("{text}"),
+            None => eprintln!("no text extracted"),
+        }
+        return;
+    }
+
+    if let Some((w, h, pixels)) = engine.snapshot(Duration::from_secs(30)) {
+        let frame = Frame::from_rgba(w, h, pixels);
+        let mut stdout = std::io::stdout();
+        let _ = emit(&mut stdout, &frame, resolve_output(cfg));
+        let _ = stdout.flush();
+    } else {
+        // Fall back to text extraction if pixel capture fails.
+        if let Some(text) = engine.text(Duration::from_secs(15)) {
+            println!("{text}");
+        } else {
+            eprintln!("no frame captured");
+        }
     }
 }
 
@@ -108,13 +120,9 @@ fn interactive(cfg: &Config, url: &str) {
     println!("serverbrowser — loading {url}");
     match Engine::new(cfg.viewport_width, cfg.viewport_height) {
         Ok(engine) => {
-            if engine.load(url).is_ok() && engine.wait_for_frame(Duration::from_secs(20)) {
-                if let Some(pixels) = engine.snapshot() {
-                    let frame = Frame::from_rgba(cfg.viewport_width, cfg.viewport_height, pixels);
-                    let mut stdout = std::io::stdout();
-                    let _ = emit(&mut stdout, &frame, resolve_output(cfg));
-                    let _ = stdout.flush();
-                }
+            if engine.load(url).is_ok() {
+                let _ = engine.wait_for_load(Duration::from_secs(5));
+                display_frame(cfg, &engine);
             }
             println!();
             println!("Press :, then a command (:open URL, :back, :reload, :quit).");
@@ -130,18 +138,9 @@ fn interactive(cfg: &Config, url: &str) {
                         match cmd {
                             C::Quit => break,
                             C::Open { url, .. } => {
-                                if engine.load(&url).is_ok()
-                                    && engine.wait_for_frame(Duration::from_secs(20))
-                                {
-                                    if let Some(px) = engine.snapshot() {
-                                        let f = Frame::from_rgba(
-                                            cfg.viewport_width,
-                                            cfg.viewport_height,
-                                            px,
-                                        );
-                                        let mut o = std::io::stdout();
-                                        let _ = emit(&mut o, &f, resolve_output(cfg));
-                                    }
+                                if engine.load(&url).is_ok() {
+                                    let _ = engine.wait_for_load(Duration::from_secs(5));
+                                    display_frame(cfg, &engine);
                                 }
                             }
                             C::Back => engine.go_back(),
@@ -239,10 +238,6 @@ fn resolve_output(cfg: &Config) -> OutputMode {
 }
 
 fn atty_stdio() -> bool {
-    // Best-effort: assume interactive unless stdout is a pipe.
-    use std::os::unix::io::AsRawFd;
-    let fd = std::io::stdout().as_raw_fd();
-    // isatty(3) style check via libc-free approach is unavailable; use a
-    // heuristic: if TERM is unset, likely not a terminal.
+    // Best-effort: assume interactive unless TERM is unset/empty.
     std::env::var("TERM").map(|t| !t.is_empty()).unwrap_or(false)
 }

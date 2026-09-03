@@ -1,0 +1,15 @@
+Mozilla Public License Version 2.0
+
+This project is licensed under the Mozilla Public License, Version 2.0 (MPL-2.0),
+matching the Servo engine it embeds.
+
+The full text of the license is available at:
+https://www.mozilla.org/en-US/MPL/2.0/
+
+In short (not a substitute for the license):
+
+  - You may use, modify, and distribute the source code.
+  - Modifications to existing MPL-licensed files must remain MPL-2.0 and be
+    made available when distributed.
+  - New files you add may be under a license of your choosing.
+  - The software is provided "as-is" without warranty.
