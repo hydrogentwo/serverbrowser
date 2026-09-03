@@ -16,7 +16,7 @@ manager backed by an Obsidian-like node mindmap.
 - **Bookmarks as a mindmap** — bookmarks are Markdown nodes in an Obsidian-like
   vault (YAML frontmatter + `[[wikilinks]]`). The graph of nodes and edges is
   stored on disk as plain `.md` files, so it is inspectable and editable
-  elsewhere, and a future minimap can just read node/edge data.
+  elsewhere, and the `minimap` command visualizes the node/edge graph.
 
 ## Status
 
@@ -68,6 +68,9 @@ serverbrowser open https://example.com
 serverbrowser bookmark-add https://doc.rust-lang.org
 serverbrowser bookmark-add https://crates.io RustDocs    # link under a parent title
 serverbrowser bookmarks
+
+# Mindmap / node graph
+serverbrowser minimap          # ASCII tree of the bookmark mindmap
 ```
 
 ## qutebrowser-style commands
@@ -116,15 +119,15 @@ Some notes here.
 ```
 
 `[[wikilinks]]` become edges in the mindmap graph. The `bookmarks` command
-prints nodes and edges; the interactive minimap overlay is a planned follow-up
-(see below).
+prints nodes and edges, and `minimap` renders the node graph as an ASCII tree.
 
 ## Roadmap / planned
 
-- Interactive TUI minimap rendering the node graph (the "node minimap").
 - Link-hints overlay (`f` to follow links).
 - Full tab management and persistent sessions.
 - Search-engine and quickmark shortcut queries.
+- A richer interactive/pager minimap (the ASCII one is in place; a full TUI
+  graph viewer is a possible follow-up).
 
 ## Building on Termux / Android
 

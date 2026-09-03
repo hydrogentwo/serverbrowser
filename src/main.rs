@@ -18,6 +18,7 @@ fn main() {
     match args.first().map(|s| s.as_str()) {
         Some("bookmark-add") | Some("ba") => cmd_bookmark_add(&cfg, &args[1..]),
         Some("bookmarks") | Some("bm") => cmd_bookmarks(&cfg),
+        Some("minimap") | Some("mm") => cmd_minimap(&cfg),
         Some("render") | Some("r") => cmd_render(&cfg, &args[1..]),
         Some("open") | Some("o") | None => cmd_open(&cfg, &args[..]),
         Some("help") | Some("-h") | Some("--help") => print_help(),
@@ -43,6 +44,7 @@ fn print_help() {
            serverbrowser render|r [URL]       render a URL once and print it\n\
            serverbrowser bookmark-add|ba <URL> [parent-title]\n\
            serverbrowser bookmarks|bm         list bookmarks (mindmap nodes)\n\
+           serverbrowser minimap|mm           show the bookmark mindmap graph\n\
          \n\
          ENV:\n\
            SERVERBROWSER_OUTPUT  kitty|sixel|blocks|text  (override output mode)\n"
@@ -201,11 +203,21 @@ fn cmd_bookmarks(cfg: &Config) {
     }
     let edges = mm.edges();
     if !edges.is_empty() {
-        println!("\nEdges (for the future minimap):");
+        println!("\nEdges:");
         for (a, b) in edges {
             println!("  {a} <-> {b}");
         }
     }
+}
+
+fn cmd_minimap(cfg: &Config) {
+    let mm = Mindmap::open(&cfg.vault_dir);
+    if mm.nodes.is_empty() {
+        println!("no bookmarks yet in {}", cfg.vault_dir.display());
+        return;
+    }
+    println!("Mindmap ({}) — {} node(s):\n", cfg.vault_dir.display(), mm.nodes.len());
+    print!("{}", mm.minimap());
 }
 
 fn title_from_url(url: &str) -> String {

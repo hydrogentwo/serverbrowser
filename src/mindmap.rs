@@ -210,12 +210,23 @@ impl Mindmap {
     ) -> std::io::Result<String> {
         let mut node = Node::new(title, Some(url.to_string()));
         if let Some(parent) = parent {
-            node.link(parent);
-            if let Some(p) = self.nodes.get_mut(parent) {
+            // Resolve the parent by title or id; slugify titles to ids for
+            // the [[wikilink]] edge. Auto-create the parent as a folder node
+            // (no URL) if it does not exist yet.
+            let parent_id = self
+                .find(parent)
+                .map(|p| p.id.clone())
+                .unwrap_or_else(|| slugify(parent));
+            node.link(&parent_id);
+            if let Some(p) = self.nodes.get_mut(&parent_id) {
                 p.link(&node.id);
-                // persist the parent's new back-link too
-                let parent_path = self.root.join(format!("{}.md", parent));
+                let parent_path = self.root.join(format!("{parent_id}.md"));
                 std::fs::write(&parent_path, p.to_markdown())?;
+            } else {
+                // Create the folder parent.
+                let mut p = Node::new(parent, None);
+                p.link(&node.id);
+                self.save_node(&p)?;
             }
         }
         let id = node.id.clone();
@@ -259,6 +270,78 @@ impl Mindmap {
             }
         }
         out
+    }
+
+    /// Render the mindmap as an ASCII "minimap":
+    /// an indented tree/forest of node titles with `--` edges, rooted at the
+    /// nodes with no inbound links (or the node with the most links if cyclic).
+    /// A trailing `~N` counts backlinks (incoming edges) beyond the tree.
+    pub fn minimap(&self) -> String {
+        let mut out = String::new();
+        // Roots = nodes with no incoming edges.
+        let mut indegree: BTreeMap<String, usize> = BTreeMap::new();
+        for n in self.nodes.values() {
+            for l in &n.links {
+                *indegree.entry(l.clone()).or_default() += 1;
+            }
+        }
+        let roots: Vec<&str> = self
+            .nodes
+            .keys()
+            .filter(|id| indegree.get(*id).copied().unwrap_or(0) == 0)
+            .map(|s| s.as_str())
+            .collect();
+
+        let mut visited: BTreeSet<String> = BTreeSet::new();
+        let mut roots = roots;
+        // If every node has an inbound link (fully cyclic), root at the most-linked.
+        if roots.is_empty() {
+            if let Some((id, _)) = self.nodes.iter().max_by_key(|(id, _)| {
+                indegree.get(*id).copied().unwrap_or(0)
+            }) {
+                roots = vec![id.as_str()];
+            }
+        }
+
+        for r in roots {
+            self.minimap_walk(r, "", "", &mut visited, &mut out);
+        }
+        // Any nodes not reached (disconnected) print as their own roots.
+        for id in self.nodes.keys() {
+            if !visited.contains(id) {
+                self.minimap_walk(id, "", "", &mut visited, &mut out);
+            }
+        }
+        out
+    }
+
+    fn minimap_walk(
+        &self,
+        id: &str,
+        branch: &str,
+        indent: &str,
+        visited: &mut BTreeSet<String>,
+        out: &mut String,
+    ) {
+        if !visited.insert(id.to_string()) {
+            return;
+        }
+        let Some(node) = self.nodes.get(id) else {
+            return;
+        };
+        let tagline = match &node.url {
+            Some(u) => format!("  [{}]", u),
+            None => String::new(),
+        };
+        out.push_str(&format!("{}{}{}\n", branch, node.title, tagline));
+
+        let kids = self.children(id);
+        for (i, kid) in kids.iter().enumerate() {
+            let last = i + 1 == kids.len();
+            let kid_branch = format!("{}{}", indent, if last { "└── " } else { "├── " });
+            let kid_indent = format!("{}{}", indent, if last { "    " } else { "│   " });
+            self.minimap_walk(&kid.id, &kid_branch, &kid_indent, visited, out);
+        }
     }
 }
 
@@ -366,5 +449,28 @@ mod tests {
         m.nodes.insert("a".into(), a);
         m.nodes.insert("b".into(), b);
         assert_eq!(m.edges(), vec![("a".to_string(), "b".to_string())]);
+    }
+
+    #[test]
+    fn minimap_renders_tree() {
+        let mut m = Mindmap::default();
+        // root -> child1, child2 ; child1 -> grandchild
+        let mut root = Node::new("Root", Some("https://root.example".into()));
+        let mut c1 = Node::new("Child One", Some("https://one.example".into()));
+        let g = Node::new("Grand", None);
+        let c2 = Node::new("Child Two", None);
+        root.link(&c1.id);
+        root.link(&c2.id);
+        c1.link(&g.id);
+        m.nodes.insert(root.id.clone(), root);
+        m.nodes.insert(c1.id.clone(), c1);
+        m.nodes.insert(c2.id.clone(), c2);
+        m.nodes.insert(g.id.clone(), g);
+
+        let s = m.minimap();
+        assert!(s.contains("Root"), "minimap should contain root: {s}");
+        assert!(s.contains("└── Child Two"), "minimap should show last child: {s}");
+        assert!(s.contains("Child One"), "minimap should contain child1: {s}");
+        assert!(s.contains("Grand"), "minimap should contain grandchild: {s}");
     }
 }
