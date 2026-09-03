@@ -237,15 +237,13 @@ impl Engine {
         self.webview.reload();
     }
 
-    /// Extract readable text from the page (DOM `innerText`), used by the
-    /// `text` output mode as a functional fallback that needs no pixel
-    /// readback.
+    /// Extract readable text from the page, used by the `text` output mode as a
+    /// functional fallback that needs no pixel readback.
     pub fn text(&self, timeout: Duration) -> Option<String> {
         let (tx, rx) = mpsc::channel::<Option<String>>();
-        // Try innerText first, fall back to textContent (innerText is less
-        // complete in some Servo builds; textContent is always available).
+        // Prefer the page title, then body text, then whole-document text.
         self.webview.evaluate_javascript(
-            "document.body ? (document.body.innerText || document.body.textContent) : document.documentElement.textContent",
+            "document.title || document.body?.innerText || document.body?.textContent || document.documentElement.textContent",
             move |result| {
                 let s = match result {
                     Ok(servo::JSValue::String(s)) => Some(s),
@@ -260,7 +258,7 @@ impl Engine {
         while Instant::now() < deadline {
             self.servo.spin_event_loop();
             match rx.try_recv() {
-                Ok(v) => return v,
+                Ok(v) => return v.filter(|s| !s.is_empty()),
                 Err(mpsc::TryRecvError::Empty) => std::thread::sleep(Duration::from_millis(2)),
                 Err(mpsc::TryRecvError::Disconnected) => return None,
             }
