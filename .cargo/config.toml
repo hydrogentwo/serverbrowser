@@ -1,0 +1,21 @@
+# Project-local cargo configuration.
+#
+# Termux exposes the Android NDK by placing headers at
+#   $PREFIX/include/android/log.h
+# while glslopt (a dependency of webrender) includes the NDK-conventional
+#   <log/log.h>   (i.e. $PREFIX/include/log/log.h)  when building for an
+# android target. We provide a no-op shim and inject its parent directory
+# into the C include search path so the C build succeeds on Termux.
+#
+# The absolute path below is anchored at the package root; adjust if you move
+# the checkout. $CARGO_MANIFEST_DIR-style variables are not expanded in [env],
+# so this must be absolute.
+[env]
+CFLAGS_aarch64_linux_android = "-I/data/data/com.termux/files/home/serverbrowser/shims"
+HOST_CFLAGS_aarch64_linux_android = "-I/data/data/com.termux/files/home/serverbrowser/shims"
+
+# Termux uses compiler-rt, not libgcc, so rustc's `-lgcc` fails to resolve.
+# We shim `libgcc.a` as a symlink to compiler-rt builtins and add its directory
+# to the linker search path.
+[build]
+rustflags = ["-L", "native=/data/data/com.termux/files/home/serverbrowser/shims/lib"]

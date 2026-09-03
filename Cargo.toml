@@ -1,0 +1,36 @@
+[package]
+name = "serverbrowser"
+version = "0.1.0"
+edition = "2024"
+description = "A terminal browser built on the Servo engine with qutebrowser-style navigation"
+license = "MPL-2.0"
+
+# Servo's default features pull in a whole UI stack (clipboard/arboard which needs
+# X11/Wayland, the winit window, etc). For a terminal browser we only need the core
+# engine + the software (headless) rendering path + baked-in resources + bundled freetype.
+[dependencies.servo]
+version = "0.5.0"
+default-features = false
+features = [
+    "baked-in-resources",
+    "bundled_freetype",
+    "js_jit",
+]
+
+# Terminal image protocols (sixel / kitty graphics).
+[dependencies]
+png = "0.17"
+image = { version = "0.25", default-features = false, features = ["png"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
+
+# Config, data, interactive CLI.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+webrender_api = "0.70.0"
+dpi = "0.1.2"
+url = "2"
+
+[[bin]]
+name = "serverbrowser"
+path = "src/main.rs"
