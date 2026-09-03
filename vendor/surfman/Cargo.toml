@@ -47,18 +47,6 @@ sm-x11 = ["x11-dl"]
 name = "surfman"
 path = "src/lib.rs"
 
-[[example]]
-name = "chaos_game"
-path = "examples/chaos_game.rs"
-
-[[example]]
-name = "offscreen"
-path = "examples/offscreen.rs"
-
-[[example]]
-name = "threads"
-path = "examples/threads.rs"
-
 [dependencies.bitflags]
 version = "2.6"
 
