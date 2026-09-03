@@ -27,15 +27,23 @@ The Servo engine initializes, loads pages (network + JS), the QuteBrowser-style
 navigation and the bookmark/mindmap manager all work end-to-end.
 
 Known issue: pixel readback of the software renderer returns a blank (white)
-frame on Termux + Mesa. Servo renders through WebRender on Mesa's `zink`
-(Gallium-llvmpipe-over-Vulkan) software driver, and `SoftwareRenderingContext`'s
-framebuffer readback does not capture the composited output on this specific
-driver combination. The whole pipeline (WebRender "generated frame with N
-passes", `notify_new_frame_ready` → `paint()`) runs; only the final
-`read_to_image` returns a cleared buffer. The `text` output mode is a fallback
-that needs no pixel readback, but Servo's `innerText`/`textContent` evaluation
-currently returns empty on this build. Resolving the readback (e.g. forcing Mesa
-to the pure-Gallium `swrast` instead of `zink`) is the main remaining task.
+frame on Termux + Mesa. Servo renders through WebRender on Mesa's software
+driver, and `SoftwareRenderingContext`'s framebuffer readback does not capture
+the composited output on this setup. The whole pipeline (WebRender "generated
+frame with N passes", `notify_new_frame_ready` → `paint()`) runs; only the
+final `read_to_image` returns a cleared buffer.
+
+On Termux, Mesa defaults the surfaceless GL context to `zink` (Vulkan lavapipe).
+You can force the classic Gallium `llvmpipe` GL driver with:
+
+    MESA_LOADER_DRIVER_OVERRIDE=swrast GALLIUM_DRIVER=llvmpipe
+
+This changes the renderer from `zink` to `llvmpipe (LLVM …)` (verified), but the
+readback still returns a blank buffer — the remaining gap is in surfman's
+`mesa_surfaceless` texture-image framebuffer path (the `EGL_KHR_gl_texture_2D_image`
+extension), not the WebRender/GL rendering itself. The `text` output mode is a
+fallback that needs no pixel readback, but Servo's `innerText`/`textContent`
+evaluation currently returns empty on this build.
 
 ## Terminal output modes
 
