@@ -23,8 +23,13 @@ fn main() {
         Some("open") | Some("o") | None => cmd_open(&cfg, &args[..]),
         Some("help") | Some("-h") | Some("--help") => print_help(),
         Some(other) => {
-            eprintln!("unknown subcommand: {other}");
-            print_help();
+            // A bare URL/path (no `open` subcommand) opens that target.
+            if other.contains("://") || other.contains('/') || other.starts_with("about:") {
+                cmd_open(&cfg, &args[..]);
+            } else {
+                eprintln!("unknown subcommand: {other}");
+                print_help();
+            }
         }
     }
 }
@@ -244,6 +249,7 @@ fn resolve_output(cfg: &Config) -> OutputMode {
 }
 
 fn atty_stdio() -> bool {
-    // Best-effort: assume interactive unless TERM is unset/empty.
-    std::env::var("TERM").map(|t| !t.is_empty()).unwrap_or(false)
+    // Interactive only when both stdin and stdout are connected to a TTY.
+    use std::io::IsTerminal;
+    std::io::stdin().is_terminal() && std::io::stdout().is_terminal()
 }
